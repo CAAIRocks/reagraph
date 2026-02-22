@@ -35,6 +35,8 @@ export interface ComboContainerProps {
   onPointerOver?: (comboId: string, event: ThreeEvent<PointerEvent>) => void;
   onPointerOut?: (comboId: string, event: ThreeEvent<PointerEvent>) => void;
   onDragged?: (comboId: string) => void;
+  exiting?: boolean;
+  onExitComplete?: (comboId: string) => void;
 }
 
 export const ComboContainer: FC<ComboContainerProps> = ({
@@ -55,7 +57,9 @@ export const ComboContainer: FC<ComboContainerProps> = ({
   onDoubleClick,
   onPointerOver,
   onPointerOut,
-  onDragged
+  onDragged,
+  exiting = false,
+  onExitComplete
 }) => {
   const theme = useStore(state => state.theme);
   const [active, setActive] = useState<boolean>(false);
@@ -129,20 +133,32 @@ export const ComboContainer: FC<ComboContainerProps> = ({
     return defaultPosition;
   }, [labelOffset, theme.combo?.label?.offset]);
 
-  const { containerPosition } = useSpring({
+  // Direction-aware entrance/exit:
+  // - Entrance (expand or initial): appear instantly at correct position.
+  // - Collapse exit: quick fade-out with slight shrink. We fade early because
+  //   the proxy node's final position is determined by re-layout and won't
+  //   align perfectly with the container center.
+  const { containerPosition, containerScale, containerOpacity } = useSpring({
     from: {
-      containerPosition: [
-        centerPosition?.x ?? 0,
-        centerPosition?.y ?? 0,
-        -1
-      ] as [number, number, number]
+      containerPosition: [center.x, center.y, -1] as [number, number, number],
+      containerScale: [1, 1, 1] as [number, number, number],
+      containerOpacity: 1
     },
     to: {
-      containerPosition: [center.x, center.y, -1] as [number, number, number]
+      containerPosition: [center.x, center.y, -1] as [number, number, number],
+      containerScale: exiting
+        ? ([0.5, 0.5, 0.5] as [number, number, number])
+        : ([1, 1, 1] as [number, number, number]),
+      containerOpacity: exiting ? 0 : 1
     },
     config: {
       ...animationConfig,
-      duration: animated && !isDragging ? undefined : 0
+      duration: exiting && animated ? 200 : 0
+    },
+    onRest: () => {
+      if (exiting) {
+        onExitComplete?.(comboId);
+      }
     }
   });
 
@@ -204,6 +220,7 @@ export const ComboContainer: FC<ComboContainerProps> = ({
         <a.group
           userData={{ id: comboId, type: 'combo' }}
           position={containerPosition as any}
+          scale={containerScale as any}
           onPointerOver={pointerOver}
           onPointerOut={pointerOut}
           onClick={(event: ThreeEvent<MouseEvent>) => {
@@ -260,6 +277,7 @@ export const ComboContainer: FC<ComboContainerProps> = ({
       theme,
       comboId,
       containerPosition,
+      containerScale,
       pointerOver,
       pointerOut,
       shape,

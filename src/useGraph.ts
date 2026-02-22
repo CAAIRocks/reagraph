@@ -4,7 +4,7 @@ import type { PerspectiveCamera } from 'three';
 
 import { getVisibleEntities } from './collapse';
 import type { LayoutOverrides, LayoutStrategy, LayoutTypes } from './layout';
-import { layoutProvider } from './layout';
+import { FORCE_LAYOUTS, layoutProvider } from './layout';
 import { tick } from './layout/layoutUtils';
 import type { SizingType } from './sizing';
 import type { DragReferences } from './store';
@@ -12,10 +12,14 @@ import { useStore } from './store';
 import type { GraphEdge, GraphNode, InternalGraphNode } from './types';
 import { calculateClusters } from './utils/cluster';
 import {
+  computeContainerFromWorldPositions,
   computeOpenComboSubLayouts,
   resolveComboPositions
 } from './utils/comboLayout';
-import { transformCollapsedCombos } from './utils/comboTransform';
+import {
+  computeCentroid,
+  transformCollapsedCombos
+} from './utils/comboTransform';
 import { buildGraph, transformGraph } from './utils/graph';
 import type { LabelVisibilityType } from './utils/visibility';
 import { calcLabelVisibility } from './utils/visibility';
@@ -64,6 +68,9 @@ export const useGraph = ({
   const stateCollapsedComboIds = useStore(state => state.collapsedComboIds);
   const stateOpenComboIds = useStore(state => state.openComboIds);
   const setComboContainers = useStore(state => state.setComboContainers);
+  const setComboAnimationHints = useStore(
+    state => state.setComboAnimationHints
+  );
   const setEdges = useStore(state => state.setEdges);
   const stateNodes = useStore(state => state.nodes);
   const setNodes = useStore(state => state.setNodes);
@@ -115,62 +122,172 @@ export const useGraph = ({
     typeof computeOpenComboSubLayouts
   > | null>(null);
 
-  const { transformedNodes: comboNodes, transformedEdges: comboEdges } =
-    useMemo(() => {
-      // First pass: compute open combo sub-layouts to determine fallbacks
-      const subLayoutOutput = computeOpenComboSubLayouts({
-        nodes: visibleNodes,
-        edges: visibleEdges,
+  const {
+    transformedNodes: comboNodes,
+    transformedEdges: comboEdges,
+    effectiveClusterAttribute
+  } = useMemo(() => {
+    // First pass: compute open combo sub-layouts to determine fallbacks
+    const subLayoutOutput = computeOpenComboSubLayouts({
+      nodes: visibleNodes,
+      edges: visibleEdges,
+      comboDefinitions: stateComboDefinitions,
+      openComboIds: stateOpenComboIds,
+      layoutType,
+      bodyNodePadding: 20
+    });
+
+    // Merge fallback combo IDs with explicitly collapsed ones
+    const effectiveCollapsedComboIds = [
+      ...stateCollapsedComboIds,
+      ...subLayoutOutput.fallbackClosedComboIds
+    ];
+
+    // Run closed combo transform with the effective collapsed set
+    const closedResult = transformCollapsedCombos({
+      nodes: visibleNodes,
+      edges: visibleEdges,
+      comboDefinitions: stateComboDefinitions,
+      collapsedComboIds: effectiveCollapsedComboIds,
+      dragReferences: dragRef.current
+    });
+
+    // If there are effective open combos, re-run sub-layout on the closed-transform output
+    if (subLayoutOutput.effectiveOpenComboIds.length > 0) {
+      const finalSubLayout = computeOpenComboSubLayouts({
+        nodes: closedResult.transformedNodes,
+        edges: closedResult.transformedEdges,
         comboDefinitions: stateComboDefinitions,
-        openComboIds: stateOpenComboIds,
+        openComboIds: subLayoutOutput.effectiveOpenComboIds,
         layoutType,
         bodyNodePadding: 20
       });
 
-      // Merge fallback combo IDs with explicitly collapsed ones
-      const effectiveCollapsedComboIds = [
-        ...stateCollapsedComboIds,
-        ...subLayoutOutput.fallbackClosedComboIds
-      ];
+      comboSubLayoutRef.current = finalSubLayout;
 
-      // Run closed combo transform with the effective collapsed set
-      const closedResult = transformCollapsedCombos({
-        nodes: visibleNodes,
-        edges: visibleEdges,
-        comboDefinitions: stateComboDefinitions,
-        collapsedComboIds: effectiveCollapsedComboIds,
-        dragReferences: dragRef.current
-      });
+      return {
+        transformedNodes: finalSubLayout.outerNodes,
+        transformedEdges: finalSubLayout.outerEdges,
+        effectiveClusterAttribute: clusterAttribute
+      };
+    }
 
-      // If there are effective open combos, re-run sub-layout on the closed-transform output
-      if (subLayoutOutput.effectiveOpenComboIds.length > 0) {
-        const finalSubLayout = computeOpenComboSubLayouts({
-          nodes: closedResult.transformedNodes,
-          edges: closedResult.transformedEdges,
-          comboDefinitions: stateComboDefinitions,
-          openComboIds: subLayoutOutput.effectiveOpenComboIds,
-          layoutType,
-          bodyNodePadding: 20
-        });
+    comboSubLayoutRef.current = null;
 
-        comboSubLayoutRef.current = finalSubLayout;
+    // Annotate nodes with combo membership for force-directed clustering
+    let resultNodes = closedResult.transformedNodes;
+    let comboClusterAttr = clusterAttribute;
 
-        return {
-          transformedNodes: finalSubLayout.outerNodes,
-          transformedEdges: finalSubLayout.outerEdges
-        };
+    const isForceLayout = FORCE_LAYOUTS.includes(layoutType);
+    if (
+      stateComboDefinitions.length > 0 &&
+      !clusterAttribute &&
+      isForceLayout
+    ) {
+      const memberToCombo = new Map<string, string>();
+      for (const combo of stateComboDefinitions) {
+        for (const memberId of combo.memberNodeIds) {
+          memberToCombo.set(memberId, combo.id);
+        }
       }
 
-      comboSubLayoutRef.current = null;
-      return closedResult;
-    }, [
-      visibleNodes,
-      visibleEdges,
-      stateComboDefinitions,
-      stateCollapsedComboIds,
-      stateOpenComboIds,
-      layoutType
-    ]);
+      resultNodes = closedResult.transformedNodes.map(node => {
+        const comboId =
+          memberToCombo.get(node.id) ??
+          (node.data?.comboId as string | undefined) ??
+          '__external__';
+        return {
+          ...node,
+          data: { ...node.data, __comboCluster: comboId }
+        };
+      });
+
+      comboClusterAttr = '__comboCluster';
+    }
+
+    return {
+      transformedNodes: resultNodes,
+      transformedEdges: closedResult.transformedEdges,
+      effectiveClusterAttribute: comboClusterAttr
+    };
+  }, [
+    visibleNodes,
+    visibleEdges,
+    stateComboDefinitions,
+    stateCollapsedComboIds,
+    stateOpenComboIds,
+    layoutType,
+    clusterAttribute
+  ]);
+
+  // Compute animation hints for combo collapse/expand transitions.
+  // Hints tell new nodes where to animate FROM (centroid of their combo).
+  const prevCollapsedRef = useRef<string[]>([]);
+  useEffect(() => {
+    const prev = prevCollapsedRef.current;
+    const curr = stateCollapsedComboIds;
+    prevCollapsedRef.current = curr;
+
+    if (stateComboDefinitions.length === 0) return;
+
+    const newlyCollapsed = curr.filter(id => !prev.includes(id));
+    const newlyExpanded = prev.filter(id => !curr.includes(id));
+
+    if (newlyCollapsed.length === 0 && newlyExpanded.length === 0) return;
+
+    const hints = new Map<
+      string,
+      { x: number; y: number; z: number; direction: 'collapse' | 'expand' }
+    >();
+    const drags = dragRef.current;
+
+    for (const comboId of newlyCollapsed) {
+      // Collapsing: proxy node appears instantly, container gets collapse hint for exit animation
+      const combo = stateComboDefinitions.find(c => c.id === comboId);
+      if (!combo) continue;
+
+      const centroid = computeCentroid(combo.memberNodeIds, [], drags);
+      if (centroid) {
+        hints.set(`combo-proxy-${comboId}`, {
+          ...centroid,
+          direction: 'collapse'
+        });
+        hints.set(`combo-container-${comboId}`, {
+          ...centroid,
+          direction: 'collapse'
+        });
+      }
+    }
+
+    for (const comboId of newlyExpanded) {
+      // Expanding: container appears instantly, member nodes animate from proxy
+      const combo = stateComboDefinitions.find(c => c.id === comboId);
+      if (!combo) continue;
+
+      const proxyId = `combo-proxy-${comboId}`;
+      const proxyPos = drags?.[proxyId]?.position;
+      if (proxyPos) {
+        hints.set(`combo-container-${comboId}`, {
+          x: proxyPos.x,
+          y: proxyPos.y,
+          z: proxyPos.z ?? 0,
+          direction: 'expand'
+        });
+        for (const memberId of combo.memberNodeIds) {
+          hints.set(memberId, {
+            x: proxyPos.x,
+            y: proxyPos.y,
+            z: proxyPos.z ?? 0,
+            direction: 'expand'
+          });
+        }
+      }
+    }
+
+    if (hints.size > 0) {
+      setComboAnimationHints(hints);
+    }
+  }, [stateCollapsedComboIds, stateComboDefinitions, setComboAnimationHints]);
 
   // Store node positions inside drags state
   const updateDrags = useCallback(
@@ -194,7 +311,7 @@ export const useGraph = ({
           graph,
           drags: dragRef.current,
           clusters: clustersRef?.current,
-          clusterAttribute
+          clusterAttribute: effectiveClusterAttribute
         });
 
       // Run the layout
@@ -310,7 +427,7 @@ export const useGraph = ({
         });
         setClusters(newClusters);
 
-        if (clusterAttribute) {
+        if (clusterAttribute || stateComboDefinitions.length > 0) {
           updateDrags(filteredNodes);
         }
       } else {
@@ -346,18 +463,26 @@ export const useGraph = ({
         setEdges(result.edges);
         setNodes(result.nodes);
         setClusters(newClusters);
-        setComboContainers(new Map());
 
-        if (clusterAttribute) {
+        if (clusterAttribute || stateComboDefinitions.length > 0) {
           updateDrags(result.nodes);
         }
       }
+
+      // Clear animation hints after React has had time to mount new Node
+      // components and read the hints for their initial spring position.
+      // Use requestAnimationFrame to ensure at least one render cycle has passed.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setComboAnimationHints(new Map());
+        });
+      });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       layoutOverrides,
       layoutType,
-      clusterAttribute,
+      effectiveClusterAttribute,
       sizingType,
       labelType,
       sizingAttribute,
@@ -368,6 +493,7 @@ export const useGraph = ({
       setNodes,
       setClusters,
       setComboContainers,
+      setComboAnimationHints,
       stateComboDefinitions,
       visibleNodes
     ]
@@ -382,6 +508,50 @@ export const useGraph = ({
   useEffect(() => {
     clustersRef.current = clusters;
   }, [clusters]);
+
+  // Compute combo containers for visible combos from positioned node data.
+  // Runs whenever positioned nodes or combo definitions change.
+  useEffect(() => {
+    if (stateComboDefinitions.length === 0 || stateNodes.length === 0) {
+      return;
+    }
+
+    // Skip if open combo pipeline already set containers
+    if (comboSubLayoutRef.current?.effectiveOpenComboIds?.length > 0) return;
+
+    const containers = new Map<string, import('./types').ComboContainerData>();
+    const nodePositionMap = new Map(stateNodes.map(n => [n.id, n.position]));
+
+    for (const combo of stateComboDefinitions) {
+      const memberPositions = new Map<
+        string,
+        { x: number; y: number; z: number }
+      >();
+      for (const memberId of combo.memberNodeIds) {
+        const pos = nodePositionMap.get(memberId);
+        if (pos) {
+          memberPositions.set(memberId, {
+            x: pos.x,
+            y: pos.y,
+            z: pos.z ?? -1
+          });
+        }
+      }
+      if (memberPositions.size > 0) {
+        containers.set(
+          combo.id,
+          computeContainerFromWorldPositions({
+            comboId: combo.id,
+            comboDefinition: combo,
+            memberPositions,
+            padding: 20
+          })
+        );
+      }
+    }
+
+    setComboContainers(containers);
+  }, [stateNodes, stateComboDefinitions, setComboContainers]);
 
   useEffect(() => {
     // When the camera position/zoom changes, update the label visibility

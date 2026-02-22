@@ -72,6 +72,16 @@ export interface GraphState {
     id: string,
     position: CenterPositionVector
   ) => void;
+  comboAnimationHints: Map<
+    string,
+    { x: number; y: number; z: number; direction: 'collapse' | 'expand' }
+  >;
+  setComboAnimationHints: (
+    hints: Map<
+      string,
+      { x: number; y: number; z: number; direction: 'collapse' | 'expand' }
+    >
+  ) => void;
 }
 
 // Create a store factory function
@@ -110,6 +120,7 @@ export const createStore = ({
     collapsedComboIds: collapsedComboIds ?? [],
     openComboIds: [],
     comboContainers: new Map(),
+    comboAnimationHints: new Map(),
     graph: new Graph({ multi: true }),
     setTheme: theme => set(state => ({ ...state, theme })),
     setClusters: clusters => set(state => ({ ...state, clusters })),
@@ -181,6 +192,8 @@ export const createStore = ({
     setOpenComboIds: ids => set(state => ({ ...state, openComboIds: ids })),
     setComboContainers: containers =>
       set(state => ({ ...state, comboContainers: containers })),
+    setComboAnimationHints: hints =>
+      set(state => ({ ...state, comboAnimationHints: hints })),
     setComboContainerPosition: (id, position) =>
       set(state => {
         const comboContainers = new Map(state.comboContainers);

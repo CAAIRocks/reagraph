@@ -240,6 +240,14 @@ export const ClosedCombo = () => {
         edges={comboEdges}
         combos={combos}
         collapsedComboIds={collapsed}
+        onNodeDoubleClick={node => {
+          if (node.data?.comboId) {
+            toggle(node.data.comboId);
+          }
+        }}
+        onComboDoubleClick={combo => {
+          toggle(combo.id);
+        }}
       />
     </div>
   );

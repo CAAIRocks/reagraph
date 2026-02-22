@@ -146,6 +146,7 @@ export const Node: FC<NodeProps> = ({
   const isSelected = useStore(state => state.selections?.includes(id));
   const hasSelections = useStore(state => state.selections?.length > 0);
   const center = useStore(state => state.centerPosition);
+  const animationHint = useStore(state => state.comboAnimationHints.get(id));
   const cluster = useStore(state => state.clusters.get(node.cluster));
 
   const isDraggingCurrent = draggingIds.includes(id);
@@ -188,10 +189,18 @@ export const Node: FC<NodeProps> = ({
     }
   }, [canCollapse, collapsedNodeIds, id, isCollapsed, setCollapsedNodeIds]);
 
+  // Use animation hint (combo centroid) as initial position if available,
+  // otherwise fall back to graph center for the default entrance animation.
+  const initialFrom = animationHint
+    ? [animationHint.x, animationHint.y, animationHint.z]
+    : center
+      ? [center.x, center.y, 0]
+      : [0, 0, 0];
+
   const [{ nodePosition, labelPosition }] = useSpring(
     () => ({
       from: {
-        nodePosition: center ? [center.x, center.y, 0] : [0, 0, 0],
+        nodePosition: initialFrom,
         labelPosition: [0, -(nodeSize + 7), 2]
       },
       to: {

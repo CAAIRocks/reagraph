@@ -16,11 +16,20 @@ export const Sphere: FC<NodeRendererProps> = ({
   opacity = 1,
   animated
 }) => {
+  // Check animation direction for combo proxy nodes.
+  // On collapse: proxy appears instantly (container shrink-out is the transition).
+  // On expand: member nodes animate from proxy position (handled by Node.tsx).
+  const collapseHint = useStore(state => {
+    const hint = state.comboAnimationHints.get(id);
+    return hint?.direction === 'collapse' && id.startsWith('combo-proxy-')
+      ? hint
+      : null;
+  });
+
   const { scale, nodeOpacity } = useSpring({
     from: {
-      // Note: This prevents incorrect scaling w/ 0
-      scale: [0.00001, 0.00001, 0.00001],
-      nodeOpacity: 0
+      scale: collapseHint ? [size, size, size] : [0.00001, 0.00001, 0.00001],
+      nodeOpacity: collapseHint ? opacity : 0
     },
     to: {
       scale: [size, size, size],
@@ -28,7 +37,7 @@ export const Sphere: FC<NodeRendererProps> = ({
     },
     config: {
       ...animationConfig,
-      duration: animated ? undefined : 0
+      duration: animated && !collapseHint ? undefined : 0
     }
   });
   const normalizedColor = useMemo(() => new Color(color), [color]);

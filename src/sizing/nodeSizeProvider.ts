@@ -58,8 +58,8 @@ export function nodeSizeProvider({ type, ...rest }: NodeSizeProviderInputs) {
     sizes.set(id, size);
   });
 
-  // Relatively scale the sizes
-  if (type !== 'none') {
+  // Relatively scale the sizes (skip for 'default' which uses explicit sizes)
+  if (type !== 'none' && type !== 'default') {
     const scale = scaleLinear()
       .domain([min, max])
       .rangeRound([minSize, maxSize]);

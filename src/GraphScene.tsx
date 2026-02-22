@@ -8,7 +8,8 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
-  useMemo
+  useMemo,
+  useRef
 } from 'react';
 
 import type {
@@ -609,12 +610,67 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
       ]
     );
 
+    // Track exiting containers for shrink-out animation
+    const prevContainerIdsRef = useRef<Set<string>>(new Set());
+    const [exitingContainers, setExitingContainers] = React.useState<
+      typeof comboContainers
+    >([]);
+
+    useEffect(() => {
+      const currentIds = new Set(comboContainers.map(c => c.comboId));
+      const prevIds = prevContainerIdsRef.current;
+
+      // Find containers that were removed (now exiting)
+      const newExiting: typeof comboContainers = [];
+      for (const id of prevIds) {
+        if (!currentIds.has(id)) {
+          // Find the container data from the previous render's snapshot
+          const exitData = exitingContainersDataRef.current.get(id);
+          if (exitData) {
+            newExiting.push(exitData);
+          }
+        }
+      }
+
+      prevContainerIdsRef.current = currentIds;
+      if (newExiting.length > 0) {
+        setExitingContainers(prev => [...prev, ...newExiting]);
+      }
+    }, [comboContainers]);
+
+    // Keep a snapshot of container data for exit animations
+    const exitingContainersDataRef = useRef(
+      new Map<string, (typeof comboContainers)[number]>()
+    );
+    useEffect(() => {
+      const map = new Map<string, (typeof comboContainers)[number]>();
+      for (const c of comboContainers) {
+        map.set(c.comboId, c);
+      }
+      exitingContainersDataRef.current = map;
+    }, [comboContainers]);
+
+    const handleExitComplete = useCallback((comboId: string) => {
+      setExitingContainers(prev => prev.filter(c => c.comboId !== comboId));
+    }, []);
+
+    const allContainers = useMemo(
+      () => [...comboContainers, ...exitingContainers],
+      [comboContainers, exitingContainers]
+    );
+
+    const exitingIds = useMemo(
+      () => new Set(exitingContainers.map(c => c.comboId)),
+      [exitingContainers]
+    );
+
     const comboContainerComponents = useMemo(
       () =>
-        comboContainers.map(container => {
+        allContainers.map(container => {
           const definition = comboDefinitions.find(
             c => c.id === container.comboId
           );
+          const isExiting = exitingIds.has(container.comboId);
           return (
             <ComboContainer
               key={container.comboId}
@@ -627,11 +683,13 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
               height={container.height}
               label={definition?.label}
               animated={animated}
-              disabled={disabled}
-              draggable={draggable}
+              disabled={disabled || isExiting}
+              draggable={draggable && !isExiting}
               labelFontUrl={labelFontUrl}
+              exiting={isExiting}
+              onExitComplete={handleExitComplete}
               onClick={
-                onComboClick
+                onComboClick && !isExiting
                   ? id => {
                       const combo = comboDefinitions.find(c => c.id === id);
                       if (combo) {
@@ -641,7 +699,7 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
                   : undefined
               }
               onDoubleClick={
-                onComboDoubleClick
+                onComboDoubleClick && !isExiting
                   ? id => {
                       const combo = comboDefinitions.find(c => c.id === id);
                       if (combo) {
@@ -654,11 +712,14 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
           );
         }),
       [
-        comboContainers,
+        allContainers,
+        exitingIds,
         comboDefinitions,
         animated,
         disabled,
+        draggable,
         labelFontUrl,
+        handleExitComplete,
         onComboClick,
         onComboDoubleClick
       ]
