@@ -39,3 +39,24 @@ All 129 tests pass (13 test files, including 12 new comboLayout tests)
 
 ## npm run build
 Build successful. Library: 218.11 kB, UMD: 240.59 kB, 26 doc components generated.
+
+## Verification (2026-02-22 re-run)
+
+### npm test
+All 129 tests pass (13 test files, 12 new comboLayout tests). Duration: 1.07s.
+
+### npm run lint
+46 errors — all from pre-existing `.vscode/extensions/b2emo/extension.js` (prettier formatting). 0 errors from implementation files. 158 warnings (all pre-existing).
+
+### npm run build
+Build successful. No TypeScript errors.
+
+### Code Review
+- `comboLayout.ts`: matches design.md interfaces and algorithm. Body node creation, edge shadow splitting with dedup, layout type restriction all implemented.
+- `useGraph.ts`: Two-phase pipeline correctly inserts after `transformCollapsedCombos()`, feeds `outerNodes`/`outerEdges` to `buildGraph`, resolves positions after `tick`, filters body nodes and shadow edges from rendered output.
+- `comboLayout.test.ts`: 12 tests covering all scenarios from tasks.md (basic, radius calc, shadow edges, intra-combo exclusion, cross-combo, dedup, position resolution, container data, layout type restriction, no-op, body node exclusion).
+- Stories: OpenCombo, MixedCombos, OpenComboForceLayout present in Combo.story.tsx.
+- Barrel export: `src/utils/index.ts` exports `comboLayout`.
+
+### Remaining
+- 8.4/8.5: Storybook visual verification requires manual inspection (`npm start`).
