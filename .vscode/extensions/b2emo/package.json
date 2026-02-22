@@ -1,0 +1,110 @@
+{
+  "name": "b2emo",
+  "displayName": "B2EMO - Bee Agent Helper",
+  "description": "Run bee agent with one click and get embedded language highlighting in YAML",
+  "version": "0.1.0",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "b2emo.run",
+        "title": "Run Bee",
+        "icon": "$(play)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "b2emo.run",
+          "group": "navigation",
+          "when": "resourceExtname == .yaml || resourceExtname == .yml"
+        }
+      ]
+    },
+    "grammars": [
+      {
+        "scopeName": "source.yaml.extended.injection",
+        "path": "./syntaxes/extended-yaml-injection.json",
+        "injectTo": [
+          "source.yaml",
+          "text.yaml",
+          "text.yaml.jinja"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.inline.markdown": "markdown",
+          "meta.embedded.inline.python": "python",
+          "meta.embedded.inline.json": "json",
+          "meta.embedded.inline.typescript": "typescript",
+          "meta.embedded.inline.rust": "rust",
+          "meta.embedded.inline.shell": "shellscript",
+          "meta.embedded.inline.ruby": "ruby",
+          "meta.embedded.inline.diff": "diff",
+          "meta.embedded.inline.toml": "toml"
+        }
+      },
+      {
+        "scopeName": "markdown.xml.injection",
+        "path": "./syntaxes/markdown-xml-injection.json",
+        "injectTo": [
+          "text.html.markdown",
+          "meta.embedded.inline.markdown"
+        ]
+      }
+    ],
+    "configurationDefaults": {
+      "editor.tokenColorCustomizations": {
+        "textMateRules": [
+          {
+            "scope": "entity.name.tag.custom.xml",
+            "settings": {
+              "foreground": "#e06c75",
+              "fontStyle": "bold"
+            }
+          },
+          {
+            "scope": "punctuation.definition.tag.begin.xml, punctuation.definition.tag.end.xml",
+            "settings": {
+              "foreground": "#abb2bf"
+            }
+          }
+        ]
+      }
+    },
+    "configuration": {
+      "title": "B2EMO Extended YAML",
+      "properties": {
+        "b2emo.decorations.codeBlockBackground": {
+          "type": "string",
+          "default": "rgba(0, 0, 0, 0.15)",
+          "description": "Background color for code blocks"
+        },
+        "b2emo.decorations.markdownBlockBackground": {
+          "type": "string",
+          "default": "rgba(30, 60, 90, 0.15)",
+          "description": "Background color for markdown blocks"
+        },
+        "b2emo.decorations.xmlTagColor": {
+          "type": "string",
+          "default": "#e06c75",
+          "description": "Color for XML-style tags"
+        },
+        "b2emo.decorations.xmlContentBackground": {
+          "type": "string",
+          "default": "rgba(224, 108, 117, 0.08)",
+          "description": "Background color for content between XML tags"
+        }
+      }
+    }
+  }
+}

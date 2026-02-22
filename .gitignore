@@ -69,3 +69,9 @@ src/**/*.css.d.ts
 
 # IDE
 .idea
+.worktrees/
+.worktree-coordination.json
+.b2emo.state
+.b2emo.toml
+.b2emo.setup
+.factory/
