@@ -11,6 +11,7 @@ import type { DragReferences } from './store';
 import { useStore } from './store';
 import type { GraphEdge, GraphNode, InternalGraphNode } from './types';
 import { calculateClusters } from './utils/cluster';
+import { transformCollapsedCombos } from './utils/comboTransform';
 import { buildGraph, transformGraph } from './utils/graph';
 import type { LabelVisibilityType } from './utils/visibility';
 import { calcLabelVisibility } from './utils/visibility';
@@ -55,6 +56,8 @@ export const useGraph = ({
   const storedNodes = useStore(state => state.nodes);
   const setClusters = useStore(state => state.setClusters);
   const stateCollapsedNodeIds = useStore(state => state.collapsedNodeIds);
+  const stateComboDefinitions = useStore(state => state.comboDefinitions);
+  const stateCollapsedComboIds = useStore(state => state.collapsedComboIds);
   const setEdges = useStore(state => state.setEdges);
   const stateNodes = useStore(state => state.nodes);
   const setNodes = useStore(state => state.setNodes);
@@ -99,6 +102,25 @@ export const useGraph = ({
       }),
     [stateCollapsedNodeIds, nodes, edges]
   );
+
+  // Apply combo collapse transform — replaces member nodes with proxies
+  const { transformedNodes: comboNodes, transformedEdges: comboEdges } =
+    useMemo(
+      () =>
+        transformCollapsedCombos({
+          nodes: visibleNodes,
+          edges: visibleEdges,
+          comboDefinitions: stateComboDefinitions,
+          collapsedComboIds: stateCollapsedComboIds,
+          dragReferences: dragRef.current
+        }),
+      [
+        visibleNodes,
+        visibleEdges,
+        stateComboDefinitions,
+        stateCollapsedComboIds
+      ]
+    );
 
   // Store node positions inside drags state
   const updateDrags = useCallback(
@@ -236,7 +258,7 @@ export const useGraph = ({
   useEffect(() => {
     async function update() {
       layoutMounted.current = false;
-      buildGraph(graph, visibleNodes, visibleEdges);
+      buildGraph(graph, comboNodes, comboEdges);
       await updateLayout();
       // rqf to prevent race condition
       requestAnimationFrame(() => (layoutMounted.current = true));
@@ -244,7 +266,7 @@ export const useGraph = ({
 
     update();
     // eslint-disable-next-line
-  }, [visibleNodes, visibleEdges]);
+  }, [comboNodes, comboEdges]);
 
   useEffect(() => {
     // Let's set the store collapsedNodeIds so its easier to access
