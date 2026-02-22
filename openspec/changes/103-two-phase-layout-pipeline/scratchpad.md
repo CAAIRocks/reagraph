@@ -60,3 +60,23 @@ Build successful. No TypeScript errors.
 
 ### Remaining
 - 8.4/8.5: Storybook visual verification requires manual inspection (`npm start`).
+
+## Verification (2026-02-22 /opsx-apply re-verification)
+
+### npm test
+All 129 tests pass (13 test files, 12 new comboLayout tests). Duration: 1.08s.
+
+### npm run lint
+46 errors — all from pre-existing `.vscode/extensions/b2emo/extension.js`. 0 errors from implementation files. 158 warnings (all pre-existing).
+
+### npm run build
+Build successful. Library: 218.11 kB, UMD: 240.59 kB, 26 doc components generated.
+
+### Implementation Completeness
+All tasks 1.1–7.4 verified complete. Key files confirmed:
+- `src/utils/comboLayout.ts`: `computeOpenComboSubLayouts()` + `resolveComboPositions()` + `computeContainerFromWorldPositions()`
+- `src/utils/comboLayout.test.ts`: 12 tests covering all design scenarios
+- `src/useGraph.ts`: Two-phase pipeline integration (lines 115-250+)
+- `src/utils/index.ts`: barrel export includes `comboLayout`
+- Stories confirmed present in `stories/demos/Combo.story.tsx`
+- Working tree clean — all changes committed in `7fb7715`
