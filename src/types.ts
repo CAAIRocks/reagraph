@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { ColorRepresentation } from 'three';
 
 import type { Theme } from './themes';
+import type { CenterPositionVector } from './utils/layout';
 
 export interface GraphElementBaseAttributes<T = any> {
   /**
@@ -366,3 +367,56 @@ export interface ClusterRendererProps {
 }
 
 export type ClusterRenderer = (args: ClusterRendererProps) => ReactNode;
+
+export interface ComboDefinition {
+  /** Unique combo identifier */
+  id: string;
+  /** Display label */
+  label: string;
+  /** Node IDs belonging to this combo */
+  memberNodeIds: string[];
+  /** Parent combo ID for nesting (undefined = top-level) */
+  parentComboId?: string;
+  /** Visual shape of the combo container */
+  shape?: 'circle' | 'rectangle';
+  /** Internal arrangement strategy for member nodes */
+  arrangement?: 'concentric' | 'grid' | 'sequential' | 'lens';
+  /** Direction for sequential arrangement */
+  arrangementDirection?: 'right' | 'down' | 'left' | 'up';
+  /** Spacing tightness (1 = loose, 10 = tight) */
+  tightness?: number;
+  /** Custom data (icon, fill, etc.) */
+  data?: Record<string, any>;
+}
+
+export interface ComboContainerData {
+  /** The combo this container represents */
+  comboId: string;
+  /** Center position of the combo */
+  center: { x: number; y: number; z: number };
+  /** Bounding box with min/max/dimensions */
+  boundingBox: CenterPositionVector;
+  /** Visual shape */
+  shape: 'circle' | 'rectangle';
+  /** Radius (for circle shape) */
+  radius?: number;
+  /** Width (for rectangle shape) */
+  width?: number;
+  /** Height (for rectangle shape) */
+  height?: number;
+  /** Node IDs contained in this combo */
+  memberNodeIds: string[];
+}
+
+export interface InternalCombo extends ComboDefinition {
+  /** Whether this combo is collapsed (showing proxy node) */
+  collapsed: boolean;
+  /** Whether this combo is open (expanded, showing members) */
+  open: boolean;
+  /** Nesting depth (0 = top-level) */
+  depth: number;
+  /** IDs of direct child combos */
+  childComboIds: string[];
+  /** Synthetic node ID when collapsed */
+  proxyNodeId?: string;
+}

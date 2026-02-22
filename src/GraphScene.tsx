@@ -29,6 +29,7 @@ import type { EdgeArrowPosition } from './symbols/edges/Edge';
 import type {
   ClusterRenderer,
   CollapseProps,
+  ComboDefinition,
   ContextMenuEvent,
   GraphEdge,
   GraphNode,
@@ -173,6 +174,26 @@ export interface GraphSceneProps {
    * Whether to aggregate edges with the same source and target.
    */
   aggregateEdges?: boolean;
+
+  /**
+   * Combo definitions for explicit node groupings.
+   */
+  combos?: ComboDefinition[];
+
+  /**
+   * List of combo IDs that should be collapsed.
+   */
+  collapsedComboIds?: string[];
+
+  /**
+   * When a combo was clicked.
+   */
+  onComboClick?: (combo: ComboDefinition) => void;
+
+  /**
+   * When a combo was double clicked.
+   */
+  onComboDoubleClick?: (combo: ComboDefinition) => void;
 
   /**
    * When a node was clicked.
@@ -339,6 +360,10 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
       onClusterDragged,
       onClusterPointerOver,
       onClusterPointerOut,
+      onComboClick,
+      onComboDoubleClick,
+      combos,
+      collapsedComboIds: collapsedComboIdsProp,
       contextMenu,
       animated,
       disabled,
@@ -397,6 +422,21 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
         setEdges(edges);
       }
     }, [edges, edgesStore.length, setEdges, aggregateEdges]);
+
+    const setComboDefinitions = useStore(state => state.setComboDefinitions);
+    const setCollapsedComboIds = useStore(state => state.setCollapsedComboIds);
+
+    useEffect(() => {
+      if (combos) {
+        setComboDefinitions(combos);
+      }
+    }, [combos, setComboDefinitions]);
+
+    useEffect(() => {
+      if (collapsedComboIdsProp) {
+        setCollapsedComboIds(collapsedComboIdsProp);
+      }
+    }, [collapsedComboIdsProp, setCollapsedComboIds]);
 
     // Center the graph on the nodes
     const { centerNodesById, fitNodesInViewById, isCentered } = useCenterGraph({

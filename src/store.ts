@@ -10,6 +10,8 @@ import { useShallow } from 'zustand/shallow';
 
 import type { Theme } from './themes';
 import type {
+  ComboContainerData,
+  ComboDefinition,
   InternalGraphEdge,
   InternalGraphNode,
   InternalGraphPosition
@@ -58,6 +60,14 @@ export interface GraphState {
   setNodePosition: (id: string, position: InternalGraphPosition) => void;
   setCollapsedNodeIds: (nodeIds: string[]) => void;
   setClusterPosition: (id: string, position: CenterPositionVector) => void;
+  comboDefinitions: ComboDefinition[];
+  collapsedComboIds: string[];
+  openComboIds: string[];
+  comboContainers: Map<string, ComboContainerData>;
+  setComboDefinitions: (definitions: ComboDefinition[]) => void;
+  setCollapsedComboIds: (ids: string[]) => void;
+  setOpenComboIds: (ids: string[]) => void;
+  setComboContainers: (containers: Map<string, ComboContainerData>) => void;
 }
 
 // Create a store factory function
@@ -65,6 +75,7 @@ export const createStore = ({
   actives = [],
   selections = [],
   collapsedNodeIds = [],
+  collapsedComboIds = [],
   theme
 }: Partial<GraphState>) =>
   create<GraphState>(set => ({
@@ -91,6 +102,10 @@ export const createStore = ({
     selections,
     hoveredNodeId: null,
     drags: {},
+    comboDefinitions: [],
+    collapsedComboIds: collapsedComboIds ?? [],
+    openComboIds: [],
+    comboContainers: new Map(),
     graph: new Graph({ multi: true }),
     setTheme: theme => set(state => ({ ...state, theme })),
     setClusters: clusters => set(state => ({ ...state, clusters })),
@@ -155,6 +170,13 @@ export const createStore = ({
       }),
     setCollapsedNodeIds: (nodeIds = []) =>
       set(state => ({ ...state, collapsedNodeIds: nodeIds })),
+    setComboDefinitions: definitions =>
+      set(state => ({ ...state, comboDefinitions: definitions })),
+    setCollapsedComboIds: ids =>
+      set(state => ({ ...state, collapsedComboIds: ids })),
+    setOpenComboIds: ids => set(state => ({ ...state, openComboIds: ids })),
+    setComboContainers: containers =>
+      set(state => ({ ...state, comboContainers: containers })),
     // Update the position of a cluster with nodes inside it
     setClusterPosition: (id, position) =>
       set(state => {

@@ -1,6 +1,7 @@
 export * from './animation';
 export * from './arrow';
 export * from './cluster';
+export * from './combo';
 export * from './dom';
 export * from './geometry';
 export * from './graph';
