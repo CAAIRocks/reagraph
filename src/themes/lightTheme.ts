@@ -38,5 +38,12 @@ export const lightTheme: Theme = {
     selectedOpacity: 1,
     inactiveOpacity: 0.1,
     label: { stroke: '#fff', color: '#2A6475' }
+  },
+  combo: {
+    stroke: '#D8E6EA',
+    opacity: 1,
+    selectedOpacity: 1,
+    inactiveOpacity: 0.1,
+    label: { stroke: '#fff', color: '#2A6475' }
   }
 };

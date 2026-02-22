@@ -68,6 +68,10 @@ export interface GraphState {
   setCollapsedComboIds: (ids: string[]) => void;
   setOpenComboIds: (ids: string[]) => void;
   setComboContainers: (containers: Map<string, ComboContainerData>) => void;
+  setComboContainerPosition: (
+    id: string,
+    position: CenterPositionVector
+  ) => void;
 }
 
 // Create a store factory function
@@ -177,6 +181,60 @@ export const createStore = ({
     setOpenComboIds: ids => set(state => ({ ...state, openComboIds: ids })),
     setComboContainers: containers =>
       set(state => ({ ...state, comboContainers: containers })),
+    setComboContainerPosition: (id, position) =>
+      set(state => {
+        const comboContainers = new Map(state.comboContainers);
+        const container = comboContainers.get(id);
+
+        if (container) {
+          const oldCenter = container.center;
+          const offset = new Vector3(
+            position.x - oldCenter.x,
+            position.y - oldCenter.y,
+            position.z - (oldCenter.z ?? 0)
+          );
+
+          const nodes: InternalGraphNode[] = [...state.nodes];
+          const drags: DragReferences = { ...state.drags };
+          nodes.forEach((node, index) => {
+            if (container.memberNodeIds.includes(node.id)) {
+              nodes[index] = {
+                ...node,
+                position: {
+                  ...node.position,
+                  x: node.position.x + offset.x,
+                  y: node.position.y + offset.y,
+                  z: node.position.z + (offset.z ?? 0)
+                } as InternalGraphPosition
+              };
+              drags[node.id] = node;
+            }
+          });
+
+          const memberNodes = nodes.filter(n =>
+            container.memberNodeIds.includes(n.id)
+          );
+          const newCenter = getLayoutCenter(memberNodes);
+
+          comboContainers.set(id, {
+            ...container,
+            center: {
+              x: newCenter?.x ?? position.x,
+              y: newCenter?.y ?? position.y,
+              z: newCenter?.z ?? position.z
+            }
+          });
+
+          return {
+            ...state,
+            drags: { ...drags, [id]: container as any },
+            comboContainers,
+            nodes
+          };
+        }
+
+        return state;
+      }),
     // Update the position of a cluster with nodes inside it
     setClusterPosition: (id, position) =>
       set(state => {

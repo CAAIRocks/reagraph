@@ -22,6 +22,7 @@ import { useStore } from './store';
 import { Node } from './symbols';
 import type { ClusterEventArgs } from './symbols/Cluster';
 import { Cluster } from './symbols/Cluster';
+import { ComboContainer } from './symbols/ComboContainer';
 import type { EdgeInterpolation, EdgeLabelPosition } from './symbols/Edge';
 import { Edge } from './symbols/Edge';
 import { Edges } from './symbols/edges';
@@ -405,6 +406,10 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
     const edgesStore = useStore(state => state.edges);
     const setEdges = useStore(state => state.setEdges);
     const clusters = useStore(state => [...state.clusters.values()]);
+    const comboContainers = useStore(state => [
+      ...state.comboContainers.values()
+    ]);
+    const comboDefinitions = useStore(state => state.comboDefinitions);
 
     // Process edges based on aggregation setting and update store
     const edges = useMemo(() => {
@@ -591,12 +596,68 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
       ]
     );
 
+    const comboContainerComponents = useMemo(
+      () =>
+        comboContainers.map(container => {
+          const definition = comboDefinitions.find(
+            c => c.id === container.comboId
+          );
+          return (
+            <ComboContainer
+              key={container.comboId}
+              comboId={container.comboId}
+              shape={container.shape}
+              center={container.center}
+              boundingBox={container.boundingBox}
+              radius={container.radius}
+              width={container.width}
+              height={container.height}
+              label={definition?.label}
+              animated={animated}
+              disabled={disabled}
+              draggable={draggable}
+              labelFontUrl={labelFontUrl}
+              onClick={
+                onComboClick
+                  ? id => {
+                      const combo = comboDefinitions.find(c => c.id === id);
+                      if (combo) {
+                        onComboClick(combo);
+                      }
+                    }
+                  : undefined
+              }
+              onDoubleClick={
+                onComboDoubleClick
+                  ? id => {
+                      const combo = comboDefinitions.find(c => c.id === id);
+                      if (combo) {
+                        onComboDoubleClick(combo);
+                      }
+                    }
+                  : undefined
+              }
+            />
+          );
+        }),
+      [
+        comboContainers,
+        comboDefinitions,
+        animated,
+        disabled,
+        labelFontUrl,
+        onComboClick,
+        onComboDoubleClick
+      ]
+    );
+
     return (
       isCentered && (
         <Fragment>
           {edgeComponents}
           {nodeComponents}
           {clusterComponents}
+          {comboContainerComponents}
         </Fragment>
       )
     );

@@ -69,4 +69,17 @@ export interface Theme {
       offset?: [number, number, number];
     };
   };
+  combo?: {
+    fill?: ColorRepresentation;
+    stroke?: ColorRepresentation;
+    opacity?: number;
+    selectedOpacity?: number;
+    inactiveOpacity?: number;
+    label?: {
+      stroke?: ColorRepresentation;
+      color: ColorRepresentation;
+      fontSize?: number;
+      offset?: [number, number, number];
+    };
+  };
 }

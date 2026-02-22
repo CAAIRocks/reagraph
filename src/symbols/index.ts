@@ -1,5 +1,7 @@
 export * from './Arrow';
 export * from './Cluster';
+export * from './ComboContainer';
+export * from './containers';
 export * from './Edge';
 export * from './edges';
 export * from './Label';

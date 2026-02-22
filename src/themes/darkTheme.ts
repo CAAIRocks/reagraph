@@ -38,5 +38,12 @@ export const darkTheme: Theme = {
     selectedOpacity: 1,
     inactiveOpacity: 0.1,
     label: { stroke: '#1E2026', color: '#ACBAC7' }
+  },
+  combo: {
+    stroke: '#474B56',
+    opacity: 1,
+    selectedOpacity: 1,
+    inactiveOpacity: 0.1,
+    label: { stroke: '#1E2026', color: '#ACBAC7' }
   }
 };
