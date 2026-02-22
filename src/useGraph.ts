@@ -11,6 +11,10 @@ import type { DragReferences } from './store';
 import { useStore } from './store';
 import type { GraphEdge, GraphNode, InternalGraphNode } from './types';
 import { calculateClusters } from './utils/cluster';
+import {
+  computeOpenComboSubLayouts,
+  resolveComboPositions
+} from './utils/comboLayout';
 import { transformCollapsedCombos } from './utils/comboTransform';
 import { buildGraph, transformGraph } from './utils/graph';
 import type { LabelVisibilityType } from './utils/visibility';
@@ -58,6 +62,8 @@ export const useGraph = ({
   const stateCollapsedNodeIds = useStore(state => state.collapsedNodeIds);
   const stateComboDefinitions = useStore(state => state.comboDefinitions);
   const stateCollapsedComboIds = useStore(state => state.collapsedComboIds);
+  const stateOpenComboIds = useStore(state => state.openComboIds);
+  const setComboContainers = useStore(state => state.setComboContainers);
   const setEdges = useStore(state => state.setEdges);
   const stateNodes = useStore(state => state.nodes);
   const setNodes = useStore(state => state.setNodes);
@@ -104,23 +110,67 @@ export const useGraph = ({
   );
 
   // Apply combo collapse transform — replaces member nodes with proxies
+  // Merge fallback closed combo IDs (open combos unsupported by current layout)
+  const comboSubLayoutRef = useRef<ReturnType<
+    typeof computeOpenComboSubLayouts
+  > | null>(null);
+
   const { transformedNodes: comboNodes, transformedEdges: comboEdges } =
-    useMemo(
-      () =>
-        transformCollapsedCombos({
-          nodes: visibleNodes,
-          edges: visibleEdges,
+    useMemo(() => {
+      // First pass: compute open combo sub-layouts to determine fallbacks
+      const subLayoutOutput = computeOpenComboSubLayouts({
+        nodes: visibleNodes,
+        edges: visibleEdges,
+        comboDefinitions: stateComboDefinitions,
+        openComboIds: stateOpenComboIds,
+        layoutType,
+        bodyNodePadding: 20
+      });
+
+      // Merge fallback combo IDs with explicitly collapsed ones
+      const effectiveCollapsedComboIds = [
+        ...stateCollapsedComboIds,
+        ...subLayoutOutput.fallbackClosedComboIds
+      ];
+
+      // Run closed combo transform with the effective collapsed set
+      const closedResult = transformCollapsedCombos({
+        nodes: visibleNodes,
+        edges: visibleEdges,
+        comboDefinitions: stateComboDefinitions,
+        collapsedComboIds: effectiveCollapsedComboIds,
+        dragReferences: dragRef.current
+      });
+
+      // If there are effective open combos, re-run sub-layout on the closed-transform output
+      if (subLayoutOutput.effectiveOpenComboIds.length > 0) {
+        const finalSubLayout = computeOpenComboSubLayouts({
+          nodes: closedResult.transformedNodes,
+          edges: closedResult.transformedEdges,
           comboDefinitions: stateComboDefinitions,
-          collapsedComboIds: stateCollapsedComboIds,
-          dragReferences: dragRef.current
-        }),
-      [
-        visibleNodes,
-        visibleEdges,
-        stateComboDefinitions,
-        stateCollapsedComboIds
-      ]
-    );
+          openComboIds: subLayoutOutput.effectiveOpenComboIds,
+          layoutType,
+          bodyNodePadding: 20
+        });
+
+        comboSubLayoutRef.current = finalSubLayout;
+
+        return {
+          transformedNodes: finalSubLayout.outerNodes,
+          transformedEdges: finalSubLayout.outerEdges
+        };
+      }
+
+      comboSubLayoutRef.current = null;
+      return closedResult;
+    }, [
+      visibleNodes,
+      visibleEdges,
+      stateComboDefinitions,
+      stateCollapsedComboIds,
+      stateOpenComboIds,
+      layoutType
+    ]);
 
   // Store node positions inside drags state
   const updateDrags = useCallback(
@@ -150,44 +200,157 @@ export const useGraph = ({
       // Run the layout
       await tick(layout.current);
 
-      // Transform the graph
-      const result = transformGraph({
-        graph,
-        layout: layout.current,
-        sizingType,
-        labelType,
-        sizingAttribute,
-        maxNodeSize,
-        minNodeSize,
-        defaultNodeSize,
-        clusterAttribute
-      });
+      const subLayoutData = comboSubLayoutRef.current;
 
-      // Calculate clusters
-      const newClusters = calculateClusters({
-        nodes: result.nodes,
-        clusterAttribute
-      });
-
-      // Do not decrease the cluster size is the number of nodes is the same
-      if (constrainDragging) {
-        newClusters.forEach(cluster => {
-          const prevCluster = clustersRef.current.get(cluster.label);
-          if (prevCluster?.nodes.length === cluster.nodes.length) {
-            cluster.position =
-              clustersRef.current?.get(cluster.label)?.position ??
-              cluster.position;
+      // Two-phase pipeline: resolve combo positions after outer layout
+      if (subLayoutData && subLayoutData.effectiveOpenComboIds.length > 0) {
+        // Extract outer layout positions from the layout engine
+        const outerLayoutPositions = new Map<
+          string,
+          { x: number; y: number; z: number }
+        >();
+        graph.forEachNode(id => {
+          const pos = layout.current.getNodePosition(id);
+          if (pos) {
+            outerLayoutPositions.set(id, {
+              x: pos.x || 0,
+              y: pos.y || 0,
+              z: pos.z || 1
+            });
           }
         });
-      }
 
-      // Set our store outputs
-      setEdges(result.edges);
-      setNodes(result.nodes);
-      setClusters(newClusters);
-      if (clusterAttribute) {
-        // Set drag positions for nodes to prevent them from being moved by the layout update
-        updateDrags(result.nodes);
+        // Collect non-member nodes (nodes currently in the outer graph)
+        const nonMemberNodeIds = new Set<string>();
+        graph.forEachNode(id => {
+          if (!id.startsWith('combo-body-')) {
+            nonMemberNodeIds.add(id);
+          }
+        });
+
+        const nonMemberNodes = visibleNodes.filter(n =>
+          nonMemberNodeIds.has(n.id)
+        );
+
+        const resolution = resolveComboPositions({
+          outerLayoutPositions,
+          subLayoutResults: subLayoutData.subLayoutResults,
+          nonMemberNodes,
+          renderEdges: subLayoutData.renderEdges,
+          comboDefinitions: stateComboDefinitions,
+          openComboIds: subLayoutData.effectiveOpenComboIds,
+          bodyNodePadding: 20
+        });
+
+        // Rebuild graph with resolved nodes (including combo members) for transformGraph
+        buildGraph(graph, resolution.resolvedNodes, resolution.resolvedEdges);
+
+        // Create a layout strategy that returns resolved positions
+        const resolvedPositionMap = new Map<
+          string,
+          { x: number; y: number; z: number }
+        >();
+
+        // Non-member nodes: use positions from outer layout
+        for (const [id, pos] of outerLayoutPositions) {
+          if (!id.startsWith('combo-body-')) {
+            resolvedPositionMap.set(id, pos);
+          }
+        }
+
+        // Member nodes: use fx/fy/fz from resolved nodes
+        for (const node of resolution.resolvedNodes) {
+          if (node.fx !== undefined && node.fy !== undefined) {
+            resolvedPositionMap.set(node.id, {
+              x: node.fx,
+              y: node.fy,
+              z: node.fz ?? 1
+            });
+          }
+        }
+
+        const resolvedLayout: typeof layout.current = {
+          step: () => true,
+          getNodePosition: (id: string) => {
+            const pos = resolvedPositionMap.get(id);
+            if (pos) {
+              return pos as any;
+            }
+            return layout.current.getNodePosition(id);
+          }
+        };
+
+        const result = transformGraph({
+          graph,
+          layout: resolvedLayout,
+          sizingType,
+          labelType,
+          sizingAttribute,
+          maxNodeSize,
+          minNodeSize,
+          defaultNodeSize,
+          clusterAttribute
+        });
+
+        // Filter out body nodes from rendered node list
+        const filteredNodes = result.nodes.filter(
+          n => !n.id.startsWith('combo-body-')
+        );
+
+        // Filter out shadow edges from rendered edge list
+        const filteredEdges = result.edges.filter(e => !e.data?.isShadow);
+
+        setEdges(filteredEdges);
+        setNodes(filteredNodes);
+        setComboContainers(resolution.comboContainers);
+
+        const newClusters = calculateClusters({
+          nodes: filteredNodes,
+          clusterAttribute
+        });
+        setClusters(newClusters);
+
+        if (clusterAttribute) {
+          updateDrags(filteredNodes);
+        }
+      } else {
+        // Standard single-pass layout — no open combos
+        const result = transformGraph({
+          graph,
+          layout: layout.current,
+          sizingType,
+          labelType,
+          sizingAttribute,
+          maxNodeSize,
+          minNodeSize,
+          defaultNodeSize,
+          clusterAttribute
+        });
+
+        const newClusters = calculateClusters({
+          nodes: result.nodes,
+          clusterAttribute
+        });
+
+        if (constrainDragging) {
+          newClusters.forEach(cluster => {
+            const prevCluster = clustersRef.current.get(cluster.label);
+            if (prevCluster?.nodes.length === cluster.nodes.length) {
+              cluster.position =
+                clustersRef.current?.get(cluster.label)?.position ??
+                cluster.position;
+            }
+          });
+        }
+
+        setEdges(result.edges);
+        setNodes(result.nodes);
+        setClusters(newClusters);
+        setComboContainers(new Map());
+
+        if (clusterAttribute) {
+          updateDrags(result.nodes);
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +366,10 @@ export const useGraph = ({
       defaultNodeSize,
       setEdges,
       setNodes,
-      setClusters
+      setClusters,
+      setComboContainers,
+      stateComboDefinitions,
+      visibleNodes
     ]
   );
 

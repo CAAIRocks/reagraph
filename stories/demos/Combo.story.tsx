@@ -413,3 +413,114 @@ export const SubLayoutLens = () => {
     </div>
   );
 };
+
+// --- Open combo stories ---
+
+const openComboNodes: GraphNode[] = [
+  { id: 'oc-1', label: 'Member 1' },
+  { id: 'oc-2', label: 'Member 2' },
+  { id: 'oc-3', label: 'Member 3' },
+  { id: 'oc-4', label: 'Member 4' },
+  { id: 'oc-5', label: 'Member 5' },
+  { id: 'oc-6', label: 'Member 6' },
+  { id: 'ext-1', label: 'External 1' },
+  { id: 'ext-2', label: 'External 2' },
+  { id: 'ext-3', label: 'External 3' }
+];
+
+const openComboEdges: GraphEdge[] = [
+  { id: 'oe-1', source: 'oc-1', target: 'oc-2' },
+  { id: 'oe-2', source: 'oc-2', target: 'oc-3' },
+  { id: 'oe-3', source: 'oc-3', target: 'oc-4' },
+  { id: 'oe-4', source: 'oc-4', target: 'oc-5' },
+  { id: 'oe-5', source: 'oc-5', target: 'oc-6' },
+  { id: 'oe-6', source: 'oc-1', target: 'ext-1' },
+  { id: 'oe-7', source: 'oc-3', target: 'ext-2' },
+  { id: 'oe-8', source: 'oc-6', target: 'ext-3' },
+  { id: 'oe-9', source: 'ext-1', target: 'ext-2' },
+  { id: 'oe-10', source: 'ext-2', target: 'ext-3' }
+];
+
+const openComboDef: ComboDefinition[] = [
+  {
+    id: 'open-group',
+    label: 'Open Group',
+    memberNodeIds: ['oc-1', 'oc-2', 'oc-3', 'oc-4', 'oc-5', 'oc-6'],
+    shape: 'circle',
+    arrangement: 'concentric',
+    tightness: 5
+  }
+];
+
+export const OpenCombo = () => (
+  <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+    <GraphCanvas
+      nodes={openComboNodes}
+      edges={openComboEdges}
+      combos={openComboDef}
+      openComboIds={['open-group']}
+      layoutType="forceDirected2d"
+    />
+  </div>
+);
+
+export const MixedCombos = () => (
+  <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+    <GraphCanvas
+      nodes={comboNodes}
+      edges={comboEdges}
+      combos={combos}
+      openComboIds={['group-a']}
+      collapsedComboIds={['group-b']}
+      layoutType="forceDirected2d"
+    />
+  </div>
+);
+
+export const OpenComboForceLayout = () => {
+  const [openIds, setOpenIds] = useState<string[]>(['group-a']);
+  const [collapsedIds, setCollapsedIds] = useState<string[]>([]);
+
+  const toggleCombo = (id: string) => {
+    if (openIds.includes(id)) {
+      setOpenIds(prev => prev.filter(c => c !== id));
+      setCollapsedIds(prev => [...prev, id]);
+    } else if (collapsedIds.includes(id)) {
+      setCollapsedIds(prev => prev.filter(c => c !== id));
+    } else {
+      setOpenIds(prev => [...prev, id]);
+      setCollapsedIds(prev => prev.filter(c => c !== id));
+    }
+  };
+
+  const getState = (id: string) => {
+    if (openIds.includes(id)) return 'open';
+    if (collapsedIds.includes(id)) return 'collapsed';
+    return 'normal';
+  };
+
+  return (
+    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+      <div style={controlStyle}>
+        <h3>Open Combo Controls</h3>
+        {combos.map(combo => (
+          <button
+            key={combo.id}
+            style={{ display: 'block', width: '100%', marginBottom: 4 }}
+            onClick={() => toggleCombo(combo.id)}
+          >
+            {combo.label}: {getState(combo.id)} (click to cycle)
+          </button>
+        ))}
+      </div>
+      <GraphCanvas
+        nodes={comboNodes}
+        edges={comboEdges}
+        combos={combos}
+        openComboIds={openIds}
+        collapsedComboIds={collapsedIds}
+        layoutType="forceDirected2d"
+      />
+    </div>
+  );
+};

@@ -187,6 +187,11 @@ export interface GraphSceneProps {
   collapsedComboIds?: string[];
 
   /**
+   * List of combo IDs that should be open (expanded with members visible).
+   */
+  openComboIds?: string[];
+
+  /**
    * When a combo was clicked.
    */
   onComboClick?: (combo: ComboDefinition) => void;
@@ -365,6 +370,7 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
       onComboDoubleClick,
       combos,
       collapsedComboIds: collapsedComboIdsProp,
+      openComboIds: openComboIdsProp,
       contextMenu,
       animated,
       disabled,
@@ -430,6 +436,7 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
 
     const setComboDefinitions = useStore(state => state.setComboDefinitions);
     const setCollapsedComboIds = useStore(state => state.setCollapsedComboIds);
+    const setOpenComboIds = useStore(state => state.setOpenComboIds);
 
     useEffect(() => {
       if (combos) {
@@ -442,6 +449,12 @@ export const GraphScene = forwardRef<GraphSceneRef, GraphSceneProps>(
         setCollapsedComboIds(collapsedComboIdsProp);
       }
     }, [collapsedComboIdsProp, setCollapsedComboIds]);
+
+    useEffect(() => {
+      if (openComboIdsProp) {
+        setOpenComboIds(openComboIdsProp);
+      }
+    }, [openComboIdsProp, setOpenComboIds]);
 
     // Center the graph on the nodes
     const { centerNodesById, fitNodesInViewById, isCentered } = useCenterGraph({

@@ -2,6 +2,7 @@ export * from './animation';
 export * from './arrow';
 export * from './cluster';
 export * from './combo';
+export * from './comboLayout';
 export * from './comboTransform';
 export * from './dom';
 export * from './geometry';
