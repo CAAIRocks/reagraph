@@ -11,4 +11,5 @@ export * from './layoutProvider';
 export * from './layoutUtils';
 export * from './nooverlap';
 export * from './recommender';
+export * from './subLayouts';
 export * from './types';

@@ -1,6 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { darkTheme, GraphCanvas, lightTheme } from '../../src';
+import { concentricSubLayout } from '../../src/layout/subLayouts/concentric';
+import { gridSubLayout } from '../../src/layout/subLayouts/grid';
+import { lensSubLayout } from '../../src/layout/subLayouts/lens';
+import { sequentialSubLayout } from '../../src/layout/subLayouts/sequential';
+import type { SubLayoutFn } from '../../src/layout/subLayouts/types';
 import type { ComboDefinition, GraphEdge, GraphNode } from '../../src/types';
 
 export default {
@@ -236,6 +241,175 @@ export const ClosedCombo = () => {
         combos={combos}
         collapsedComboIds={collapsed}
       />
+    </div>
+  );
+};
+
+// --- Sub-layout demo helpers ---
+
+const subLayoutNodeIds = Array.from({ length: 12 }, (_, i) => `sub-${i + 1}`);
+const subLayoutEdges: GraphEdge[] = subLayoutNodeIds.slice(1).map((id, i) => ({
+  id: `sub-e-${i}`,
+  source: subLayoutNodeIds[i],
+  target: id
+}));
+
+const controlStyle: React.CSSProperties = {
+  zIndex: 9,
+  position: 'absolute',
+  top: 15,
+  right: 15,
+  background: 'rgba(0, 0, 0, .5)',
+  padding: 10,
+  color: 'white'
+};
+
+function useSubLayoutNodes(
+  fn: SubLayoutFn,
+  opts: { tightness: number; direction?: 'right' | 'down' | 'left' | 'up' }
+): GraphNode[] {
+  return useMemo(() => {
+    const { positions } = fn({
+      nodeIds: subLayoutNodeIds,
+      tightness: opts.tightness,
+      direction: opts.direction
+    });
+    return subLayoutNodeIds.map(id => {
+      const pos = positions.get(id) ?? { x: 0, y: 0 };
+      return { id, label: id, fx: pos.x, fy: pos.y };
+    });
+  }, [fn, opts.tightness, opts.direction]);
+}
+
+// --- Sub-layout stories ---
+
+export const SubLayoutConcentric = () => {
+  const [tightness, setTightness] = useState(5);
+  const nodes = useSubLayoutNodes(concentricSubLayout, { tightness });
+
+  return (
+    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+      <div style={controlStyle}>
+        <h3>Concentric Sub-Layout</h3>
+        <label>
+          Tightness: {tightness}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={tightness}
+            onChange={e => setTightness(Number(e.target.value))}
+            style={{ display: 'block', width: '100%' }}
+          />
+        </label>
+      </div>
+      <GraphCanvas nodes={nodes} edges={subLayoutEdges} layoutType="custom" />
+    </div>
+  );
+};
+
+export const SubLayoutGrid = () => {
+  const [tightness, setTightness] = useState(5);
+  const nodes = useSubLayoutNodes(gridSubLayout, { tightness });
+
+  return (
+    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+      <div style={controlStyle}>
+        <h3>Grid Sub-Layout</h3>
+        <label>
+          Tightness: {tightness}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={tightness}
+            onChange={e => setTightness(Number(e.target.value))}
+            style={{ display: 'block', width: '100%' }}
+          />
+        </label>
+      </div>
+      <GraphCanvas nodes={nodes} edges={subLayoutEdges} layoutType="custom" />
+    </div>
+  );
+};
+
+const sequentialNodeIds = subLayoutNodeIds.slice(0, 8);
+const sequentialEdges = subLayoutEdges.slice(0, 7);
+
+export const SubLayoutSequential = () => {
+  const [tightness, setTightness] = useState(5);
+  const [direction, setDirection] = useState<'right' | 'down' | 'left' | 'up'>(
+    'right'
+  );
+
+  const nodes = useMemo(() => {
+    const { positions } = sequentialSubLayout({
+      nodeIds: sequentialNodeIds,
+      tightness,
+      direction
+    });
+    return sequentialNodeIds.map(id => {
+      const pos = positions.get(id) ?? { x: 0, y: 0 };
+      return { id, label: id, fx: pos.x, fy: pos.y };
+    });
+  }, [tightness, direction]);
+
+  return (
+    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+      <div style={controlStyle}>
+        <h3>Sequential Sub-Layout</h3>
+        <label>
+          Tightness: {tightness}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={tightness}
+            onChange={e => setTightness(Number(e.target.value))}
+            style={{ display: 'block', width: '100%' }}
+          />
+        </label>
+        <div style={{ marginTop: 8 }}>
+          {(['right', 'down', 'left', 'up'] as const).map(d => (
+            <label key={d} style={{ display: 'block' }}>
+              <input
+                type="radio"
+                name="direction"
+                value={d}
+                checked={direction === d}
+                onChange={() => setDirection(d)}
+              />{' '}
+              {d}
+            </label>
+          ))}
+        </div>
+      </div>
+      <GraphCanvas nodes={nodes} edges={sequentialEdges} layoutType="custom" />
+    </div>
+  );
+};
+
+export const SubLayoutLens = () => {
+  const [tightness, setTightness] = useState(5);
+  const nodes = useSubLayoutNodes(lensSubLayout, { tightness });
+
+  return (
+    <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}>
+      <div style={controlStyle}>
+        <h3>Lens Sub-Layout</h3>
+        <label>
+          Tightness: {tightness}
+          <input
+            type="range"
+            min={1}
+            max={10}
+            value={tightness}
+            onChange={e => setTightness(Number(e.target.value))}
+            style={{ display: 'block', width: '100%' }}
+          />
+        </label>
+      </div>
+      <GraphCanvas nodes={nodes} edges={subLayoutEdges} layoutType="custom" />
     </div>
   );
 };
