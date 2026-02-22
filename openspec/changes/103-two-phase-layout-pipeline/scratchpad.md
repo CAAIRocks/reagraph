@@ -99,3 +99,31 @@ Build successful. Library: 218.11 kB, UMD: 240.59 kB, 26 doc components generate
 - Stories: `OpenCombo`, `MixedCombos`, `OpenComboForceLayout` present in `Combo.story.tsx`.
 - Barrel export: `src/utils/index.ts` exports `comboLayout`.
 - All tasks 1.1–7.4 complete. Tasks 8.4/8.5 require manual Storybook visual inspection.
+
+## Verification (2026-02-22 /opsx-apply session — independent re-run)
+
+### npm test
+All 129 tests pass (13 test files, 12 new comboLayout tests). Duration: 1.08s.
+
+### npm run lint
+46 errors — all from pre-existing `.vscode/extensions/b2emo/extension.js`. 0 errors from implementation files. 158 warnings (all pre-existing).
+
+### npm run build
+Build successful. Library: 218.11 kB, UMD: 240.59 kB, 26 doc components generated.
+
+### Status
+All automated verification (8.1–8.3) confirmed passing. Working tree clean. Tasks 8.4/8.5 (manual Storybook visual inspection) remain — these require running `npm start` and visually confirming the OpenCombo, MixedCombos, and OpenComboForceLayout stories render correctly, and that existing demos show no regression.
+
+## Verification (2026-02-22 /opsx-apply — final confirmation)
+
+### npm test
+All 129 tests pass (13 test files, 12 new comboLayout tests). Duration: 1.57s.
+
+### npm run lint
+46 errors — all from pre-existing `.vscode/extensions/b2emo/extension.js`. 0 errors from implementation files. 158 warnings (all pre-existing).
+
+### npm run build
+Build successful. 26 doc components generated.
+
+### Status
+All automated verification confirmed passing. Implementation complete per spec. Only manual Storybook visual verification (8.4/8.5) remains outstanding.
